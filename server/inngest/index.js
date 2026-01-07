@@ -74,7 +74,10 @@ const syncWorkspaceCreation = inngest.createFunction(
       });
     } catch (error) {
       // Ignore unique constraint on slug (Prisma P2002) to preserve original create() logic
-      if (error?.code === "P2002" && String(error?.meta?.target || []).includes("slug")) {
+      if (
+        error?.code === "P2002" &&
+        String(error?.meta?.target || []).includes("slug")
+      ) {
         // workspace with same slug already exists — skip create
       } else {
         throw error;
@@ -94,9 +97,13 @@ const syncWorkspaceCreation = inngest.createFunction(
     if (!memberExists) {
       // If workspace was not created due to slug conflict, try to resolve the actual workspace id
       let workspaceId = data.id;
-      const wsById = await prisma.workspace.findUnique({ where: { id: data.id } });
+      const wsById = await prisma.workspace.findUnique({
+        where: { id: data.id },
+      });
       if (!wsById) {
-        const wsBySlug = await prisma.workspace.findUnique({ where: { slug: data.slug } });
+        const wsBySlug = await prisma.workspace.findUnique({
+          where: { slug: data.slug },
+        });
         if (wsBySlug) workspaceId = wsBySlug.id;
       }
 
