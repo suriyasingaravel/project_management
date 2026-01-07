@@ -21,6 +21,7 @@ function WorkspaceDropdown() {
     setIsOpen(false);
     navigate("/");
   };
+  console.log(currentWorkspace);
 
   // Close dropdown on outside click
   useEffect(() => {

@@ -103,7 +103,7 @@ const syncWorkspaceCreation = inngest.createFunction(
   }
 );
 
-//Inngest function to save workspace data in database
+//Inngest function to update workspace data in database
 const syncWorkspaceUpdation = inngest.createFunction(
   { id: "update-workspace-from-clerk" },
   { event: "clerk/organization.updated" },
@@ -112,6 +112,11 @@ const syncWorkspaceUpdation = inngest.createFunction(
     await prisma.workspace.update({
       where: {
         id: data.id,
+      },
+      data: {
+        name: data.name,
+        slug: data.slug,
+        image_url: data.image_url || "",
       },
     });
   }
