@@ -62,9 +62,18 @@ const syncWorkspaceCreation = inngest.createFunction(
   { event: "clerk/organization.created" },
   async ({ event }) => {
     const { data } = event;
-    await prisma.workspace.create({
-      data: {
+    await prisma.workspace.upsert({
+      where: {
         id: data.id,
+      },
+      create: {
+        id: data.id,
+        name: data.name,
+        slug: data.slug,
+        ownerId: data.created_by,
+        image_url: data.image_url,
+      },
+      update: {
         name: data.name,
         slug: data.slug,
         ownerId: data.created_by,
@@ -72,14 +81,25 @@ const syncWorkspaceCreation = inngest.createFunction(
       },
     });
 
-    //Add creator as ADMIN Member
-    await prisma.workspaceMember.create({
-      data: {
-        userId: data.created_by,
-        workspaceId: data.id,
-        role: "ADMIN",
+    //Add creator as ADMIN Member if not already exists
+    const memberExists = await prisma.workspaceMember.findUnique({
+      where: {
+        userId_workspaceId: {
+          userId: data.created_by,
+          workspaceId: data.id,
+        },
       },
     });
+
+    if (!memberExists) {
+      await prisma.workspaceMember.create({
+        data: {
+          userId: data.created_by,
+          workspaceId: data.id,
+          role: "ADMIN",
+        },
+      });
+    }
   }
 );
 
@@ -97,7 +117,7 @@ const syncWorkspaceUpdation = inngest.createFunction(
   }
 );
 
-//Inngest function to save workspace data in database
+//Inngest function to delete workspace data in database
 const syncWorkspaceDeletion = inngest.createFunction(
   { id: "delete-workspace-with-clerk" },
   { event: "clerk/organization.deleted" },
@@ -106,11 +126,6 @@ const syncWorkspaceDeletion = inngest.createFunction(
     await prisma.workspace.delete({
       where: {
         id: data.id,
-      },
-      data: {
-        name: data.name,
-        slug: data.slug,
-        image_url: data.image_url,
       },
     });
   }
