@@ -62,27 +62,24 @@ const syncWorkspaceCreation = inngest.createFunction(
   { event: "clerk/organization.created" },
   async ({ event }) => {
     const { data } = event;
-    try {
-      await prisma.workspace.create({
-        data: {
-          id: data.id,
-          name: data.name,
-          slug: data.slug,
-          ownerId: data.created_by,
-          image_url: data.image_url,
-        },
-      });
-    } catch (error) {
-      // Ignore unique constraint on slug (Prisma P2002) to preserve original create() logic
-      if (
-        error?.code === "P2002" &&
-        String(error?.meta?.target || []).includes("slug")
-      ) {
-        // workspace with same slug already exists — skip create
-      } else {
-        throw error;
-      }
-    }
+    await prisma.workspace.upsert({
+      where: {
+        id: data.id,
+      },
+      create: {
+        id: data.id,
+        name: data.name,
+        slug: data.slug,
+        ownerId: data.created_by,
+        image_url: data.image_url,
+      },
+      update: {
+        name: data.name,
+        slug: data.slug,
+        ownerId: data.created_by,
+        image_url: data.image_url,
+      },
+    });
 
     //Add creator as ADMIN Member if not already exists
     const memberExists = await prisma.workspaceMember.findUnique({
@@ -95,22 +92,10 @@ const syncWorkspaceCreation = inngest.createFunction(
     });
 
     if (!memberExists) {
-      // If workspace was not created due to slug conflict, try to resolve the actual workspace id
-      let workspaceId = data.id;
-      const wsById = await prisma.workspace.findUnique({
-        where: { id: data.id },
-      });
-      if (!wsById) {
-        const wsBySlug = await prisma.workspace.findUnique({
-          where: { slug: data.slug },
-        });
-        if (wsBySlug) workspaceId = wsBySlug.id;
-      }
-
       await prisma.workspaceMember.create({
         data: {
           userId: data.created_by,
-          workspaceId,
+          workspaceId: data.id,
           role: "ADMIN",
         },
       });
@@ -118,7 +103,7 @@ const syncWorkspaceCreation = inngest.createFunction(
   }
 );
 
-//Inngest function to update workspace data in database
+//Inngest function to save workspace data in database
 const syncWorkspaceUpdation = inngest.createFunction(
   { id: "update-workspace-from-clerk" },
   { event: "clerk/organization.updated" },
@@ -127,11 +112,6 @@ const syncWorkspaceUpdation = inngest.createFunction(
     await prisma.workspace.update({
       where: {
         id: data.id,
-      },
-      data: {
-        name: data.name,
-        slug: data.slug,
-        image_url: data.image_url || "",
       },
     });
   }
