@@ -103,17 +103,29 @@ const syncWorkspaceCreation = inngest.createFunction(
   }
 );
 
-//Inngest function to save workspace data in database
+//Inngest function to update workspace data in database
 const syncWorkspaceUpdation = inngest.createFunction(
   { id: "update-workspace-from-clerk" },
   { event: "clerk/organization.updated" },
   async ({ event }) => {
     const { data } = event;
-    await prisma.workspace.update({
-      where: {
-        id: data.id,
-      },
-    });
+    try {
+      await prisma.workspace.update({
+        where: {
+          id: data.id,
+        },
+        data: {
+          name: data.name,
+          slug: data.slug,
+          image_url: data.image_url || "",
+        },
+      });
+    } catch (error) {
+      // Ignore error if workspace doesn't exist (not yet synced from create event)
+      if (error?.code !== "P2025") {
+        throw error;
+      }
+    }
   }
 );
 
@@ -123,11 +135,18 @@ const syncWorkspaceDeletion = inngest.createFunction(
   { event: "clerk/organization.deleted" },
   async ({ event }) => {
     const { data } = event;
-    await prisma.workspace.delete({
-      where: {
-        id: data.id,
-      },
-    });
+    try {
+      await prisma.workspace.delete({
+        where: {
+          id: data.id,
+        },
+      });
+    } catch (error) {
+      // Ignore error if workspace doesn't exist (already deleted or never synced)
+      if (error?.code !== "P2025") {
+        throw error;
+      }
+    }
   }
 );
 
